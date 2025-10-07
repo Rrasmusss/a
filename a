@@ -1,0 +1,89 @@
+-- Make sure Rayfield UI Library is loaded
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Dead Rails Bonds Shop",
+    LoadingTitle = "Dead Rails Bonds Shop",
+    LoadingSubtitle = "by YourName",
+    ConfigurationSaving = {Enabled = false}
+})
+
+-- Helper to create item selectors
+local function createItemSection(tab, sectionName, items)
+    local section = tab:CreateSection(sectionName)
+    for _, item in ipairs(items) do
+        section:CreateDropdown({
+            Name = "Select Quantity for " .. item,
+            Options = {"1", "2", "3", "4", "5"},
+            CurrentOption = "1",
+            Callback = function(quantity)
+                Rayfield:Notify({
+                    Title = "Selection",
+                    Content = "You chose to buy " .. quantity .. "x " .. item,
+                    Duration = 5
+                })
+            end
+        })
+    end
+end
+
+-- General Store Tab
+local generalStoreTab = Window:CreateTab("General Store")
+createItemSection(generalStoreTab, "General Items", {
+    "Coal (fuel)",
+    "Molotovs",
+    "Helmet",
+    "Chestplate"
+})
+
+-- Gunsmith Tab
+local gunsmithTab = Window:CreateTab("Gunsmith")
+createItemSection(gunsmithTab, "Weapons", {
+    "Revolver",
+    "Shotgun",
+    "Rifle"
+})
+createItemSection(gunsmithTab, "Ammunition", {
+    "Revolver Ammo",
+    "Rifle Ammo",
+    "Shotgun Shells"
+})
+
+-- Doctor's Office Tab
+local doctorTab = Window:CreateTab("Doctor's Office")
+createItemSection(doctorTab, "Consumables", {
+    "Bandage",
+    "Snake Oil"
+})
+
+-- Tailor Tab (Class Unlocks/Switches)
+local tailorTab = Window:CreateTab("Tailor (Classes)")
+createItemSection(tailorTab, "Class Unlocks", {
+    "Arsonist",
+    "Necromancer",
+    "Packmaster",
+    "The Alamo",
+    "High Roller",
+    "Conductor",
+    "Cowboy",
+    "Werewolf",
+    "Survivalist",
+    "Vampire",
+    "Zombie",
+    "Priest",
+    "Ironclad"
+})
+
+-- Train Station Tab (Train Unlocks/Swaps)
+local trainTab = Window:CreateTab("Train Station")
+createItemSection(trainTab, "Trains", {
+    "Cattle Car",
+    "Gold Rush",
+    "Armored Train"
+})
+
+Rayfield:Notify({
+    Title = "Dead Rails Bonds Shop",
+    Content = "UI Loaded! Select an item and quantity to mock purchase.",
+    Duration = 6
+})
