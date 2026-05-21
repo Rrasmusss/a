@@ -1,0 +1,207 @@
+-- Variables and Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Script States
+local orbitEnabled = false
+local autoShootEnabled = false
+local angle = 0
+
+-- Configuration
+local ORBIT_SPEED = 100
+local ORBIT_RADIUS = 1
+
+-- UI Creation
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local OrbitButton = Instance.new("TextButton")
+local AutoShootButton = Instance.new("TextButton")
+local EjectButton = Instance.new("TextButton")
+local UIGradient = Instance.new("UIGradient")
+local UIStroke = Instance.new("UIStroke")
+
+-- GUI Configurations
+ScreenGui.Name = "HvH_Testing_GUI"
+ScreenGui.Parent = game:GetService("CoreInterface") or LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Position = UDim2.new(0.4, 0, 0.4, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 260)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 0, 0, 10)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "HVH TESTING"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+
+-- Button Styling Function
+local function styleButton(btn, text, posy)
+    btn.Parent = MainFrame
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.Position = UDim2.new(0.05, 0, 0, posy)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Font = Enum.Font.Gotham
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    btn.TextSize = 14
+    btn.BorderSizePixel = 0
+    
+    local round = Instance.new("UICorner")
+    round.CornerRadius = UDim.new(0, 6)
+    round.Parent = btn
+end
+
+styleButton(OrbitButton, "Orbit + VoidSpam: OFF", 60)
+styleButton(AutoShootButton, "Auto Shoot: OFF", 115)
+styleButton(EjectButton, "Eject Script", 190)
+EjectButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+
+-- Animated RGB Outlines
+UIStroke.Parent = MainFrame
+UIStroke.Thickness = 2
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+UIGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+})
+UIGradient.Parent = UIStroke
+
+-- Smooth Corners for Main Window
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+-- 1. ANIMATIONS: Continuous Outline Rotation
+RunService.RenderStepped:Connect(function()
+    UIGradient.Rotation = (UIGradient.Rotation + 2) % 360
+end)
+
+-- Button Hover & Toggle Transitions
+local function toggleVisuals(btn, state)
+    local targetColor = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(150, 150, 150)
+    local targetBg = state and Color3.fromRGB(40, 50, 45) or Color3.fromRGB(30, 30, 30)
+    
+    TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = targetColor, BackgroundColor3 = targetBg}):Play()
+end
+
+OrbitButton.MouseButton1Click:Connect(function()
+    orbitEnabled = not orbitEnabled
+    OrbitButton.Text = "Orbit + VoidSpam: " .. (orbitEnabled and "ON" or "OFF")
+    toggleVisuals(OrbitButton, orbitEnabled)
+end)
+
+AutoShootButton.MouseButton1Click:Connect(function()
+    autoShootEnabled = not autoShootEnabled
+    AutoShootButton.Text = "Auto Shoot: " .. (autoShootEnabled and "ON" or "OFF")
+    toggleVisuals(AutoShootButton, autoShootEnabled)
+end)
+
+-- 2. DRAGGABLE: Smooth GUI Drag System
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- 3. CORE LOGIC: Orbit, VoidSpam & Shooting Vector
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            if player.Character.Humanoid.Health > 0 then
+                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function isTargetVisible(targetPart)
+    local _, onScreen = Camera:WorldToScreenPoint(targetPart.Position)
+    return onScreen
+end
+
+local function simulateClick()
+    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+local loopConnection
+loopConnection = RunService.Heartbeat:Connect(function(deltaTime)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    local target = getClosestPlayer()
+
+    if orbitEnabled and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local targetRoot = target.Character.HumanoidRootPart
+        angle = angle + (ORBIT_SPEED * deltaTime)
+        local offset = Vector3.new(math.cos(angle) * ORBIT_RADIUS, 0, math.sin(angle) * ORBIT_RADIUS)
+        
+        rootPart.Velocity = Vector3.new(0, 0, 0)
+        rootPart.CFrame = CFrame.new(targetRoot.Position + offset, targetRoot.Position)
+    end
+
+    if autoShootEnabled and target and target.Character and target.Character:FindFirstChild("Head") then
+        if isTargetVisible(target.Character.Head) then
+            simulateClick()
+        end
+    end
+end)
+
+-- 4. EJECTABLE: Instantly stop all loops and clear memory
+EjectButton.MouseButton1Click:Connect(function()
+    orbitEnabled = false
+    autoShootEnabled = false
+    if loopConnection then loopConnection:Disconnect() end
+    ScreenGui:Destroy()
+end)
